@@ -1,0 +1,9 @@
+version: 1
+thresholds:
+  observe_max_x100: 39
+  warn_max_x100: 79
+  block_min_x100: 80
+weights:
+  rules_x100: 40
+  classifier_x100: 40
+  anomaly_x100: 20

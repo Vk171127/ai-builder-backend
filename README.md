@@ -1,6 +1,22 @@
-# FastAPI Starter Template
+# Gatekeeper Backend
 
-A production-ready FastAPI backend starter template with best practices, testing, and comprehensive documentation.
+Gatekeeper is the scam-pattern analyser backend. This repository now includes API scaffolding and a deterministic synthetic data simulator for model training.
+
+## Gatekeeper Simulator Docs
+
+- Full simulator documentation (seed data, schema, deterministic guarantees, validation, infra):
+  - `ml/simulator/README.md`
+
+### Quickstart (simulator)
+
+```bash
+python -m ml.simulator.generate --scams 10000 --benign 100000 --seed 42
+```
+
+Outputs are written to:
+
+- `ml/simulator/out/sessions.parquet`
+- `ml/simulator/out/events.parquet`
 
 ## Features
 
@@ -57,18 +73,21 @@ A production-ready FastAPI backend starter template with best practices, testing
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <your-repo-url>
 cd ai-builder/be
 ```
 
 2. Create and activate a virtual environment:
+
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
 3. Install dependencies:
+
 ```bash
 make install
 # or
@@ -76,6 +95,7 @@ pip install -r requirements.txt
 ```
 
 4. Copy the example environment file and configure:
+
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
@@ -98,12 +118,14 @@ The API will be available at `http://localhost:8000`
 #### API Documentation
 
 Once running, visit:
+
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
 ### Testing
 
 Run all tests:
+
 ```bash
 make test
 # or
@@ -111,6 +133,7 @@ pytest
 ```
 
 Run tests with coverage:
+
 ```bash
 make test-cov
 # or
@@ -120,6 +143,7 @@ pytest --cov=app --cov-report=html --cov-report=term
 ### Code Quality
 
 Format code:
+
 ```bash
 make format
 # or
@@ -128,6 +152,7 @@ ruff check --fix app tests
 ```
 
 Run linter:
+
 ```bash
 make lint
 # or
@@ -225,6 +250,7 @@ cp .env.example .env
 ```
 
 Key variables:
+
 - `SECRET_KEY`: Change this in production
 - `ALLOWED_ORIGINS`: Update with your frontend URLs
 - `DATABASE_URL`: Add when using a database

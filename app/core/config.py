@@ -1,6 +1,8 @@
-"""Application configuration management."""
+"""Application configuration management for Gatekeeper."""
 
-from pydantic import Field, field_validator
+from typing import Literal
+
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,16 +17,14 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = Field(default="FastAPI Starter", alias="APP_NAME")
+    app_name: str = Field(default="Gatekeeper", alias="APP_NAME")
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
     app_env: str = Field(default="development", alias="APP_ENV")
     debug: bool = Field(default=True, alias="DEBUG")
+    gatekeeper_env: Literal["fake", "gcp"] = Field(default="fake", alias="GATEKEEPER_ENV")
 
     # API
-    api_v1_prefix: str = Field(default="/api/v1", alias="API_V1_PREFIX")
-    secret_key: str = Field(
-        default="your-secret-key-change-this-in-production", alias="SECRET_KEY"
-    )
+    api_v1_prefix: str = Field(default="/v1", alias="API_V1_PREFIX")
 
     # Server
     host: str = Field(default="0.0.0.0", alias="HOST")
@@ -32,21 +32,23 @@ class Settings(BaseSettings):
     reload: bool = Field(default=True, alias="RELOAD")
 
     # CORS
-    allowed_origins: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
+    allowed_origins_raw: str = Field(
+        default="http://localhost:3000,http://localhost:8000",
         alias="ALLOWED_ORIGINS",
     )
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
+    @property
+    def allowed_origins(self) -> list[str]:
         """Parse comma-separated CORS origins string into list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
+        return [origin.strip() for origin in self.allowed_origins_raw.split(",") if origin.strip()]
 
     # Logging
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+
+    # External integrations / model runtime
+    gemini_model_id: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL_ID")
+    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    policy_file: str = Field(default="policy.yaml", alias="POLICY_FILE")
 
     @property
     def is_production(self) -> bool:

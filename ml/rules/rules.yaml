@@ -1,0 +1,8 @@
+version: 1
+rules:
+  - id: rapid_velocity
+    when: velocity_x100 > 80
+    score_x100: 35
+  - id: repeated_high_risk_signals
+    when: high_risk_event_count > 3
+    score_x100: 50

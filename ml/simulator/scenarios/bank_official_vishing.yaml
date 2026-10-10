@@ -1,0 +1,27 @@
+scam_type: bank_official_vishing
+stages:
+  contact:
+    behaviours: [suspicious]
+    source: phone
+    emission_prob: 0.9
+    gap_seconds: { mean: 1.2, sigma: 0.45 }
+  trust_building:
+    behaviours: [normal, suspicious]
+    source: phone
+    emission_prob: 0.75
+    gap_seconds: { mean: 1.4, sigma: 0.5 }
+  isolation:
+    behaviours: [suspicious, malicious]
+    source: extension
+    emission_prob: 0.8
+    gap_seconds: { mean: 1.35, sigma: 0.45 }
+  pressure:
+    behaviours: [malicious]
+    source: phone
+    emission_prob: 0.9
+    gap_seconds: { mean: 1.05, sigma: 0.35 }
+  extraction:
+    behaviours: [malicious]
+    source: server
+    emission_prob: 0.96
+    gap_seconds: { mean: 0.95, sigma: 0.3 }

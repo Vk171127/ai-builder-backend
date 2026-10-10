@@ -1,0 +1,27 @@
+scam_type: remote_access_tech
+stages:
+  contact:
+    behaviours: [suspicious]
+    source: phone
+    emission_prob: 0.9
+    gap_seconds: { mean: 1.2, sigma: 0.45 }
+  trust_building:
+    behaviours: [suspicious, malicious]
+    source: extension
+    emission_prob: 0.84
+    gap_seconds: { mean: 1.35, sigma: 0.45 }
+  isolation:
+    behaviours: [malicious]
+    source: extension
+    emission_prob: 0.9
+    gap_seconds: { mean: 1.25, sigma: 0.4 }
+  pressure:
+    behaviours: [malicious]
+    source: phone
+    emission_prob: 0.94
+    gap_seconds: { mean: 1.0, sigma: 0.35 }
+  extraction:
+    behaviours: [malicious]
+    source: server
+    emission_prob: 0.97
+    gap_seconds: { mean: 0.9, sigma: 0.3 }

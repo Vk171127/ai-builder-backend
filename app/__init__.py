@@ -1,3 +1,3 @@
-"""FastAPI Starter Application."""
+"""Gatekeeper analyser application."""
 
 __version__ = "0.1.0"

@@ -1,0 +1,27 @@
+scam_type: digital_arrest_trai
+stages:
+  contact:
+    behaviours: [suspicious]
+    source: phone
+    emission_prob: 0.94
+    gap_seconds: { mean: 1.1, sigma: 0.4 }
+  trust_building:
+    behaviours: [suspicious, malicious]
+    source: extension
+    emission_prob: 0.82
+    gap_seconds: { mean: 1.35, sigma: 0.4 }
+  isolation:
+    behaviours: [malicious]
+    source: extension
+    emission_prob: 0.88
+    gap_seconds: { mean: 1.45, sigma: 0.4 }
+  pressure:
+    behaviours: [malicious]
+    source: phone
+    emission_prob: 0.93
+    gap_seconds: { mean: 1.0, sigma: 0.35 }
+  extraction:
+    behaviours: [malicious]
+    source: server
+    emission_prob: 0.97
+    gap_seconds: { mean: 0.95, sigma: 0.3 }

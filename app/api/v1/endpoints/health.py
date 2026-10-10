@@ -13,7 +13,7 @@ class HealthResponse(BaseModel):
     version: str
 
 
-@router.get("/health", response_model=HealthResponse, tags=["Health"])
+@router.get("/healthz", response_model=HealthResponse, tags=["Health"])
 async def health_check() -> HealthResponse:
     """
     Health check endpoint.
@@ -25,7 +25,7 @@ async def health_check() -> HealthResponse:
     return HealthResponse(status="healthy", version=__version__)
 
 
-@router.get("/ready", response_model=HealthResponse, tags=["Health"])
+@router.get("/readyz", response_model=HealthResponse, tags=["Health"])
 async def readiness_check() -> HealthResponse:
     """
     Readiness check endpoint.

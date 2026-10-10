@@ -1,0 +1,27 @@
+scam_type: romance_scam
+stages:
+  contact:
+    behaviours: [normal, suspicious]
+    source: extension
+    emission_prob: 0.72
+    gap_seconds: { mean: 1.7, sigma: 0.6 }
+  trust_building:
+    behaviours: [normal, suspicious]
+    source: extension
+    emission_prob: 0.7
+    gap_seconds: { mean: 1.8, sigma: 0.65 }
+  isolation:
+    behaviours: [suspicious]
+    source: phone
+    emission_prob: 0.74
+    gap_seconds: { mean: 1.5, sigma: 0.5 }
+  pressure:
+    behaviours: [suspicious, malicious]
+    source: phone
+    emission_prob: 0.78
+    gap_seconds: { mean: 1.2, sigma: 0.4 }
+  extraction:
+    behaviours: [malicious]
+    source: server
+    emission_prob: 0.9
+    gap_seconds: { mean: 1.0, sigma: 0.35 }
