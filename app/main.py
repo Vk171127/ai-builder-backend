@@ -1,11 +1,17 @@
 """FastAPI application entry point."""
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
+from app.services.pipeline_service import get_pipeline_service
+from app.services.reasoner.warmup import periodic_warmup_loop, warmup_warning_cache
+
+LOGGER = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -20,9 +26,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"Environment: {settings.app_env}")
     print(f"Debug mode: {settings.debug}")
 
+    pipeline = get_pipeline_service()
+    _ = pipeline.models_loaded()
+    try:
+        await warmup_warning_cache(state_store=pipeline.state)
+    except Exception as exc:
+        LOGGER.warning("reasoner_warmup_startup_failed error=%s", str(exc))
+
+    warmup_task = asyncio.create_task(
+        periodic_warmup_loop(state_store=pipeline.state)
+    )
+    app.state.reasoner_warmup_task = warmup_task
+
     yield
 
     # Shutdown
+    task = getattr(app.state, "reasoner_warmup_task", None)
+    if task is not None:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     print("Shutting down application")
 
 

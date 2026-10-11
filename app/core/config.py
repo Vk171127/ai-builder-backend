@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
     app_env: str = Field(default="development", alias="APP_ENV")
     debug: bool = Field(default=True, alias="DEBUG")
-    gatekeeper_env: Literal["fake", "gcp"] = Field(default="fake", alias="GATEKEEPER_ENV")
 
     # API
     api_v1_prefix: str = Field(default="/v1", alias="API_V1_PREFIX")
@@ -45,10 +44,35 @@ class Settings(BaseSettings):
     # Logging
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
-    # External integrations / model runtime
+    # GCP (credentials come from Application Default Credentials: the runtime
+    # service account when deployed, `gcloud auth application-default login` locally)
+    gcp_project: str = Field(default="", validation_alias=AliasChoices("GOOGLE_CLOUD_PROJECT", "GCP_PROJECT"))
+    gcp_location: str = Field(default="us-central1", validation_alias=AliasChoices("GCP_REGION", "GCP_LOCATION"))
     gemini_model_id: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL_ID")
-    redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")
+    bigquery_dataset: str = Field(default="gatekeeper", alias="BIGQUERY_DATASET")
+    pubsub_topic: str = Field(default="decisions", alias="PUBSUB_TOPIC")
+    pubsub_topic_decisions: str = Field(default="", alias="PUBSUB_TOPIC_DECISIONS")
+    pubsub_topic_outcomes: str = Field(default="", alias="PUBSUB_TOPIC_OUTCOMES")
+
+    # State store (Firestore)
+    state_backend: Literal["memory", "firestore"] = Field(default="memory", alias="STATE_BACKEND")
+    firestore_project_id: str = Field(default="", alias="FIRESTORE_PROJECT_ID")
+    firestore_database: str = Field(default="(default)", alias="FIRESTORE_DATABASE")
+    firestore_analyses_collection: str = Field(default="analyses", alias="FIRESTORE_ANALYSES_COLLECTION")
+    firestore_collection_prefix: str = Field(default="gatekeeper_state", alias="FIRESTORE_COLLECTION_PREFIX")
+
     policy_file: str = Field(default="policy.yaml", alias="POLICY_FILE")
+    reasoner_warmup_timeout_ms: int = Field(default=7000, alias="REASONER_WARMUP_TIMEOUT_MS")
+    reasoner_warmup_fail_open_static: bool = Field(default=True, alias="REASONER_WARMUP_FAIL_OPEN_STATIC")
+    reasoner_warmup_use_llm: bool = Field(default=False, alias="REASONER_WARMUP_USE_LLM")
+
+    @property
+    def effective_pubsub_topic_decisions(self) -> str:
+        return self.pubsub_topic_decisions.strip() or self.pubsub_topic
+
+    @property
+    def effective_pubsub_topic_outcomes(self) -> str:
+        return self.pubsub_topic_outcomes.strip() or self.pubsub_topic
 
     @property
     def is_production(self) -> bool:

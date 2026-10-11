@@ -18,7 +18,10 @@ class ReasonerResult(BaseModel):
 class Decision(BaseModel):
     id: str
     session_id: str
-    risk_x100: int
+    risk: float
+    action: str
+    scam_type: str
     stage: Stage
+    explanation_pending: bool = False
     intervention: Intervention | None = None
     reasoner: ReasonerResult | None = None

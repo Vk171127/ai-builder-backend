@@ -1,9 +1,16 @@
 version: 1
-thresholds:
-  observe_max_x100: 39
-  warn_max_x100: 79
-  block_min_x100: 80
-weights:
-  rules_x100: 40
-  classifier_x100: 40
-  anomaly_x100: 20
+w1: 0.45
+w2: 0.25
+w3: 0.20
+w4: 0.10
+reasoner_weight_max: 0.30
+stage_multipliers:
+  contact: 0.7
+  trust_building: 0.85
+  isolation: 1.0
+  pressure: 1.1
+  extraction: 1.25
+source_trust_ceiling: 0.75
+graph_boost:
+  in_graph: 0.10
+  distance_1: 0.20

@@ -1,17 +1,39 @@
 """Session window persistence abstraction."""
 
+from __future__ import annotations
+
+import json
+
 from app.models.signal import SignalEvent
+from app.models.signal import ValidatedBatch
+from db.state.store import StateStore
 
 
-class SessionService:
-    """Load and write session windows.
+def load_session_window(
+    session_id: str,
+    validated: ValidatedBatch,
+    state_store: StateStore | None,
+    now_ms: int,
+) -> list[SignalEvent]:
+    """Read/merge/write 15-minute event window for a session."""
+    incoming = validated.accepted
+    if state_store is None:
+        return sorted(incoming, key=lambda event: event.timestamp_ms)
 
-    Redis-backed implementation can be introduced behind this interface.
-    """
+    key = f"session:{session_id}:events"
+    min_score = now_ms - 900_000
+    try:
+        existing_rows = state_store.zrangebyscore(key, min_score, now_ms)
+        existing_events = [SignalEvent.model_validate_json(row) for row in existing_rows]
+        merged: dict[str, SignalEvent] = {event.event_id: event for event in existing_events}
+        for event in incoming:
+            merged[event.event_id] = event
 
-    async def load(self, session_id: str) -> list[SignalEvent]:
-        _ = session_id
-        return []
+        ordered = sorted(merged.values(), key=lambda event: event.timestamp_ms)
 
-    async def write(self, session_id: str, events: list[SignalEvent]) -> None:
-        _ = (session_id, events)
+        for event in ordered:
+            state_store.zadd(key, {event.model_dump_json(): event.timestamp_ms})
+        state_store.zremrangebyscore(key, -10**18, min_score)
+        return ordered
+    except Exception:
+        return sorted(incoming, key=lambda event: event.timestamp_ms)

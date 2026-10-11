@@ -1,6 +1,6 @@
 POST /v1/analyse
 │
-├── 1. Validate + Window Load          pure Python + Redis
+├── 1. Validate + Window Load          pure Python + Firestore
 │
 ├── 2. Enrichment (parallel, 80ms)     Cloud Web Risk API + internal calls
 │
@@ -11,7 +11,7 @@ POST /v1/analyse
 │   └── 6. Detector C: Anomaly         sklearn IsolationForest + numpy z-scores
 │   (all three concurrent)
 │
-├── 7. Stage Tracker (HMM)            numpy — updates Redis belief state
+├── 7. Stage Tracker (HMM)            numpy — updates Firestore belief state
 │
 ├── 8. Fusion + Policy                pure Python + policy.yaml
 │

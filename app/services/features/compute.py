@@ -1,110 +1,147 @@
-"""Feature computation from events and enrichment context."""
+"""Feature computation for Gatekeeper hot-path."""
 
-import statistics
+from __future__ import annotations
 
-from app.models.signal import SignalEvent
+import math
+from collections import defaultdict
+
+from app.models.signal import Behaviour, SignalEvent
 from app.schemas.feature import FeatureVector
+
+
+COERCION_BEHAVIOURS = {
+    Behaviour.authority_claim,
+    Behaviour.keyword_authority,
+    Behaviour.keyword_courier_drugs,
+    Behaviour.isolation_demand,
+}
+PAYMENT_BEHAVIOURS = {Behaviour.new_payee, Behaviour.paste_payee}
+
+
+def _safe_nan(values: dict[str, float], missing: dict[str, bool], key: str) -> None:
+    values[key] = float("nan")
+    missing[f"{key}_missing"] = True
 
 
 def compute(
     events: list[SignalEvent],
-    context: dict[str, int | str | bool | None],
-    config: dict[str, int | str | bool | None],
+    context: dict[str, object],
+    config: dict[str, object],
 ) -> FeatureVector:
-    _ = config
-    behaviour_counts: dict[str, int] = {"normal": 0, "suspicious": 0, "malicious": 0}
-    source_counts: dict[str, int] = {"phone": 0, "extension": 0, "server": 0}
-    stage_counts: dict[str, int] = {
-        "contact": 0,
-        "trust_building": 0,
-        "isolation": 0,
-        "pressure": 0,
-        "extraction": 0,
-    }
+    if not events:
+        values = {name: float("nan") for name in FeatureVector.FEATURE_ORDER}
+        missing = {f"{name}_missing": True for name in FeatureVector.FEATURE_ORDER}
+        return FeatureVector(values=values, missing_flags=missing)
 
-    new_payee_count = 0
-    amount_outlier_count = 0
-    trust_values: list[int] = []
-    contact_phone_count = 0
-    trust_building_extension_count = 0
-    isolation_extension_count = 0
-    pressure_phone_count = 0
-    extraction_server_count = 0
+    ordered = sorted(events, key=lambda event: event.timestamp_ms)
+    values: dict[str, float] = {}
+    missing: dict[str, bool] = {}
 
-    for event in events:
-        if event.behaviour is not None:
-            key = str(event.behaviour.value)
-            if key in behaviour_counts:
-                behaviour_counts[key] += 1
+    # Group A: Presence
+    for key in ["normal", "suspicious", "malicious"]:
+        bucket = [event for event in ordered if event.behaviour is not None and event.behaviour.value == key]
+        values[f"presence_{key}"] = 1.0 if bucket else 0.0
+        weighted = sum(float(event.trust or 0.0) for event in bucket)
+        values[f"trust_weighted_{key}"] = weighted / len(bucket) if bucket else 0.0
+        missing[f"presence_{key}_missing"] = False
+        missing[f"trust_weighted_{key}_missing"] = False
 
-        source = str(event.signal_type)
-        if source in source_counts:
-            source_counts[source] += 1
+    timestamps = [event.timestamp_ms for event in ordered]
+    duration_s = max(1.0, float(timestamps[-1] - timestamps[0]) / 1000.0)
 
-        stage = event.metadata.get("stage")
-        if isinstance(stage, str) and stage in stage_counts:
-            stage_counts[stage] += 1
+    # Group B: Temporal
+    values["session_duration_s"] = duration_s
+    values["burst_density"] = float(len(ordered)) / duration_s
+    missing["session_duration_s_missing"] = False
+    missing["burst_density_missing"] = False
 
-            if stage == "contact" and source == "phone":
-                contact_phone_count += 1
-            elif stage == "trust_building" and source == "extension":
-                trust_building_extension_count += 1
-            elif stage == "isolation" and source == "extension":
-                isolation_extension_count += 1
-            elif stage == "pressure" and source == "phone":
-                pressure_phone_count += 1
-            elif stage == "extraction" and source == "server":
-                extraction_server_count += 1
-
-        if event.metadata.get("new_payee") is True:
-            new_payee_count += 1
-        if event.metadata.get("amount_outlier") is True:
-            amount_outlier_count += 1
-
-        if event.value_x100 is not None:
-            trust_values.append(event.value_x100)
-
-    avg_trust = int(sum(trust_values) / len(trust_values)) if trust_values else 0
-    baseline_trust = context.get("baseline_trust_x100")
-    if isinstance(baseline_trust, int):
-        profile_trust_x100 = max(0, min(100, (avg_trust + baseline_trust) // 2))
+    # authority_before_payment
+    authority_times = [event.timestamp_ms for event in ordered if event.behaviour in COERCION_BEHAVIOURS]
+    payment_times = [event.timestamp_ms for event in ordered if event.behaviour in PAYMENT_BEHAVIOURS]
+    if authority_times and payment_times:
+        values["authority_before_payment"] = 1.0 if min(authority_times) <= min(payment_times) else 0.0
+        missing["authority_before_payment_missing"] = False
     else:
-        profile_trust_x100 = max(0, min(100, avg_trust))
+        _safe_nan(values, missing, "authority_before_payment")
 
-    trust_std = int(statistics.pstdev(trust_values)) if len(trust_values) > 1 else 0
-    event_count = len(events)
-    suspicious_ratio = (
-        int((behaviour_counts["suspicious"] * 100) / event_count) if event_count > 0 else 0
-    )
-    malicious_ratio = (
-        int((behaviour_counts["malicious"] * 100) / event_count) if event_count > 0 else 0
-    )
+    gaps = [
+        float(ordered[index].timestamp_ms - ordered[index - 1].timestamp_ms) / 1000.0
+        for index in range(1, len(ordered))
+    ]
+    values["max_inter_event_gap_s"] = max(gaps) if gaps else 0.0
+    missing["max_inter_event_gap_s_missing"] = False
 
-    return FeatureVector(
-        event_count=len(events),
-        high_risk_event_count=sum(1 for event in events if (event.value_x100 or 0) > 80),
-        velocity_x100=min(100, len(events) * 5),
-        profile_trust_x100=profile_trust_x100,
-        normal_count=behaviour_counts["normal"],
-        suspicious_count=behaviour_counts["suspicious"],
-        malicious_count=behaviour_counts["malicious"],
-        phone_count=source_counts["phone"],
-        extension_count=source_counts["extension"],
-        server_count=source_counts["server"],
-        new_payee_count=new_payee_count,
-        amount_outlier_count=amount_outlier_count,
-        contact_count=stage_counts["contact"],
-        trust_building_count=stage_counts["trust_building"],
-        isolation_count=stage_counts["isolation"],
-        pressure_count=stage_counts["pressure"],
-        extraction_count=stage_counts["extraction"],
-        avg_trust_x100=max(0, min(100, avg_trust)),
-        std_trust_x100=max(0, min(100, trust_std)),
-        suspicious_ratio_x100=max(0, min(100, suspicious_ratio)),
-        malicious_ratio_x100=max(0, min(100, malicious_ratio)),
-        contact_phone_count=contact_phone_count,
-        trust_building_extension_count=trust_building_extension_count,
-        isolation_extension_count=isolation_extension_count,
-        pressure_phone_count=pressure_phone_count,
-        extraction_server_count=extraction_server_count,
-    )
+    # Group C: Cross-device
+    cross_window_s = float(config.get("cross_device_window_s", 300))
+    coercion_events = [event for event in ordered if event.source.value == "phone" and event.behaviour in COERCION_BEHAVIOURS]
+    payment_events = [event for event in ordered if event.source.value == "extension" and event.behaviour in PAYMENT_BEHAVIOURS]
+
+    pair_gaps: list[float] = []
+    for coercion in coercion_events:
+        for payment in payment_events:
+            gap_s = abs(float(payment.timestamp_ms - coercion.timestamp_ms) / 1000.0)
+            if gap_s <= cross_window_s:
+                pair_gaps.append(gap_s)
+
+    values["has_cross_device_coercion"] = 1.0 if pair_gaps else 0.0
+    missing["has_cross_device_coercion_missing"] = False
+
+    if pair_gaps:
+        values["cross_device_gap_s"] = min(pair_gaps)
+        missing["cross_device_gap_s_missing"] = False
+    else:
+        _safe_nan(values, missing, "cross_device_gap_s")
+
+    # Group D: Context
+    amounts = [
+        int(event.metadata["amount_minor"])
+        for event in ordered
+        if isinstance(event.metadata.get("amount_minor"), int)
+    ]
+    profile_avg = context.get("avg_payment_minor")
+    if amounts and isinstance(profile_avg, (int, float)) and float(profile_avg) > 0:
+        values["amount_ratio"] = float(max(amounts)) / float(profile_avg)
+        missing["amount_ratio_missing"] = False
+    else:
+        _safe_nan(values, missing, "amount_ratio")
+
+    if any(event.metadata.get("new_payee") is True for event in ordered):
+        values["payee_is_new"] = 1.0
+    elif any(event.metadata.get("new_payee") is False for event in ordered):
+        values["payee_is_new"] = 0.0
+    else:
+        _safe_nan(values, missing, "payee_is_new")
+    if "payee_is_new" in values:
+        missing["payee_is_new_missing"] = False
+
+    if timestamps:
+        event_hour = ((timestamps[0] // 1000) // 3600) % 24
+        usual_hour = context.get("usual_hour")
+        if isinstance(usual_hour, (int, float)):
+            values["hour_deviation"] = float(abs(int(event_hour) - int(usual_hour)))
+            missing["hour_deviation_missing"] = False
+        else:
+            _safe_nan(values, missing, "hour_deviation")
+
+    # Group E: Reputation
+    mule_score = context.get("payee_mule_score")
+    if isinstance(mule_score, (int, float)):
+        values["payee_mule_score"] = float(mule_score)
+        missing["payee_mule_score_missing"] = False
+    else:
+        _safe_nan(values, missing, "payee_mule_score")
+
+    web_risk_flagged = context.get("web_risk_flagged")
+    values["web_risk_flagged"] = 1.0 if web_risk_flagged is True else 0.0
+    missing["web_risk_flagged_missing"] = False
+
+    in_graph = context.get("payee_in_graph")
+    values["payee_in_graph"] = 1.0 if in_graph is True else 0.0
+    missing["payee_in_graph_missing"] = False
+
+    # Ensure all features exist with explicit missing semantics
+    for name in FeatureVector.FEATURE_ORDER:
+        if name not in values:
+            _safe_nan(values, missing, name)
+
+    return FeatureVector(values=values, missing_flags=missing)

@@ -1,8 +1,34 @@
 version: 1
 rules:
-  - id: rapid_velocity
-    when: velocity_x100 > 80
-    score_x100: 35
-  - id: repeated_high_risk_signals
-    when: high_risk_event_count > 3
-    score_x100: 50
+  - id: R001
+    all_of: ["AUTHORITY_CLAIM", "SCREEN_SHARE_LIKELY", "NEW_PAYEE"]
+    scam_type: digital_arrest
+    floor: 0.90
+  - id: R002
+    all_of: ["LOOKALIKE_DOMAIN", "CARD_OTP_FORM"]
+    scam_type: phishing_credential
+    floor: 0.95
+  - id: R003
+    all_of: ["KEYWORD_COURIER_DRUGS", "ISOLATION_DEMAND", "PASTE_PAYEE"]
+    scam_type: digital_arrest
+    floor: 0.85
+  - id: R004
+    all_of: ["PASTE_OTP", "OTP_TOO_FAST", "UNKNOWN_DEVICE"]
+    scam_type: bank_official_vishing
+    floor: 0.80
+  - id: R005
+    all_of: ["KEYWORD_AUTHORITY", "SECOND_VOICE", "AMOUNT_OUTLIER"]
+    scam_type: digital_arrest
+    floor: 0.88
+  - id: R006
+    all_of: ["HOMOGLYPH_DOMAIN", "CARD_OTP_FORM"]
+    scam_type: phishing_credential
+    floor: 0.95
+  - id: R007
+    all_of: ["KEYWORD_INVESTMENT_RETURNS", "NEW_PAYEE", "AMOUNT_OUTLIER"]
+    scam_type: investment
+    floor: 0.75
+  - id: R008
+    all_of: ["REMOTE_ACCESS_TOOL_OPEN", "PASTE_PAYEE", "PASTE_AMOUNT"]
+    scam_type: remote_access_support
+    floor: 0.82
